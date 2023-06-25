@@ -37,6 +37,15 @@ type Model struct {
 	err     error
 }
 
+func (m *Model) GetCurrent() string    { return m.cwd }
+func (m *Model) SetCurrent(cwd string) { m.refresh(cwd) }
+
+func (m *Model) refresh(path string) {
+	m.cwd = path
+	m.choices, m.err = os.ReadDir(m.cwd)
+	m.cursor = 0
+}
+
 func (m *Model) Init() tea.Cmd { return nil }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -59,14 +68,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if !choice.Type().IsDir() {
 				break
 			}
-			m.cwd = filepath.Join(m.cwd, m.choices[m.cursor].Name())
-			m.choices, m.err = os.ReadDir(m.cwd)
-			m.cursor = 0
+			m.refresh(filepath.Join(m.cwd, m.choices[m.cursor].Name()))
 
 		case "backspace", "h":
-			m.cwd = filepath.Dir(m.cwd)
-			m.choices, m.err = os.ReadDir(m.cwd)
-			m.cursor = 0
+			m.refresh(filepath.Dir(m.cwd))
+
 		}
 	}
 
