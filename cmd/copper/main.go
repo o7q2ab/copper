@@ -8,9 +8,10 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"golang.org/x/mod/modfile"
 )
 
-const version = "day-1"
+const version = "day-2"
 
 func main() {
 	fmt.Printf("copper %s\n", version)
@@ -95,7 +96,7 @@ func (c *copper) View() string {
 	hiddenStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#999999"))
 	dirStyle := lipgloss.NewStyle().Bold(true)
 
-	s := fmt.Sprintf("%s\n\n", c.cwd)
+	var s string
 
 	for i, choice := range c.choices {
 		cursor := " "
@@ -104,8 +105,26 @@ func (c *copper) View() string {
 		}
 
 		name := choice.Name()
+
+		if name == "go.mod" {
+			gomod, err := readModFile(filepath.Join(c.cwd, name))
+			if err != nil {
+				s = fmt.Sprintf("Module: (error) %s\n\n", err)
+			}
+			directDeps, indirectDeps := 0, 0
+			for _, d := range gomod.Require {
+				if d.Indirect {
+					indirectDeps++
+				} else {
+					directDeps++
+				}
+			}
+			s = fmt.Sprintf("Module: %s\n\tdirect dependencies: %d\n\tindirect dependencies: %d\n\n",
+				gomod.Module.Mod.Path, directDeps, indirectDeps) + s
+		}
+
 		switch {
-		case name == "go.mod" || name == "go.sum":
+		case name == "go.mod" || name == "go.sum" || name == "go.work" || name == "go.work.sum":
 			name = goBoldStyle.Render(name)
 
 		case strings.HasSuffix(name, ".go"):
@@ -129,7 +148,20 @@ func (c *copper) View() string {
 		}
 	}
 
+	s = fmt.Sprintf("%s\n\n", c.cwd) + s
 	s += "\nPress q to quit.\n"
 
 	return s
+}
+
+func readModFile(path string) (*modfile.File, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	f, err := modfile.Parse(path, content, nil)
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
 }
