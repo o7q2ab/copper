@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
-const version = "day-0"
+const version = "day-1"
 
 func main() {
 	fmt.Printf("copper %s\n", version)
@@ -88,6 +90,11 @@ func (c *copper) View() string {
 		return fmt.Sprintf("error: %v\n\nPress backspace to go back.\nPress q to quit.\n", c.err)
 	}
 
+	goStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#363cb3"))
+	goBoldStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#363cb3")).Bold(true)
+	hiddenStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#999999"))
+	dirStyle := lipgloss.NewStyle().Bold(true)
+
 	s := fmt.Sprintf("%s\n\n", c.cwd)
 
 	for i, choice := range c.choices {
@@ -96,17 +103,30 @@ func (c *copper) View() string {
 			cursor = ">"
 		}
 
+		name := choice.Name()
+		switch {
+		case name == "go.mod" || name == "go.sum":
+			name = goBoldStyle.Render(name)
+
+		case strings.HasSuffix(name, ".go"):
+			name = goStyle.Render(name)
+
+		case strings.HasPrefix(name, "."):
+			name = hiddenStyle.Render(name)
+		}
+
 		if choice.Type().IsDir() {
-			s += fmt.Sprintf("%s %s\n", cursor, choice.Name())
+			name = dirStyle.Render(name)
+
+			s += fmt.Sprintf("%s %s\n", cursor, name)
 		} else {
 			info, err := choice.Info()
 			if err != nil {
-				s += fmt.Sprintf("%s %s (%v)\n", cursor, choice.Name(), err)
+				s += fmt.Sprintf("%s %s (%v)\n", cursor, name, err)
 			} else {
-				s += fmt.Sprintf("%s %s (%d bytes)\n", cursor, choice.Name(), info.Size())
+				s += fmt.Sprintf("%s %s (%d bytes)\n", cursor, name, info.Size())
 			}
 		}
-
 	}
 
 	s += "\nPress q to quit.\n"
