@@ -10,7 +10,7 @@ import (
 	"github.com/o7q2ab/copper/internal/pearls/picker"
 )
 
-const version = "day-4"
+const version = "day-5"
 
 func main() {
 	fmt.Printf("copper %s\n", version)

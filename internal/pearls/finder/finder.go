@@ -32,9 +32,14 @@ func (m *Model) SetCurrent(root string) {
 	m.root = root
 
 	m.choices = []*goProject{}
-	filepath.Walk(root, func(path string, info fs.FileInfo, err error) error {
-		if info.Name() == "go.mod" {
+	filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		switch filepath.Base(path) {
+		case "go.mod":
 			m.choices = append(m.choices, &goProject{path})
+		case ".git":
+			return filepath.SkipDir
+		case "vendor":
+			return filepath.SkipDir
 		}
 		return nil
 	})
