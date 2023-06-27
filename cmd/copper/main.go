@@ -6,15 +6,22 @@ import (
 	"path/filepath"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/o7q2ab/copper/internal/pearls/finder"
 	"github.com/o7q2ab/copper/internal/pearls/picker"
 )
 
-const version = "day-5"
+const version = "copper day-6"
+
+const (
+	color1 = "#454D66"
+	color2 = "#309975"
+	color3 = "#58B368"
+	color4 = "#DAD873"
+	color5 = "#EFEEB4"
+)
 
 func main() {
-	fmt.Printf("copper %s\n", version)
-
 	pickerModel, err := picker.New()
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
@@ -38,6 +45,8 @@ func main() {
 }
 
 type copper struct {
+	windowWidth int
+
 	stage tea.Model
 
 	picker *picker.Model
@@ -48,6 +57,9 @@ func (c *copper) Init() tea.Cmd { return nil }
 
 func (c *copper) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		c.windowWidth = msg.Width
+
 	case tea.KeyMsg:
 		switch msg.String() {
 
@@ -81,7 +93,15 @@ func (c *copper) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (c *copper) View() string {
-	s := c.stage.View()
+	var style = lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color(color5)).
+		Background(lipgloss.Color(color1)).
+		Width(c.windowWidth).
+		Align(lipgloss.Center)
+
+	s := style.Render(version) + "\n"
+	s += c.stage.View()
 	s += "\nPress q to quit.\n"
 	return s
 }
