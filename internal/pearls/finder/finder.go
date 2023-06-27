@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -12,9 +13,7 @@ import (
 )
 
 func New() *Model {
-	return &Model{
-		selected: -1,
-	}
+	return &Model{}
 }
 
 type goProject struct {
@@ -22,10 +21,9 @@ type goProject struct {
 }
 
 type Model struct {
-	root     string
-	choices  []*goProject
-	selected int
-	cursor   int
+	root    string
+	choices []*goProject
+	cursor  int
 }
 
 func (m *Model) SetCurrent(root string) {
@@ -45,10 +43,7 @@ func (m *Model) SetCurrent(root string) {
 	})
 }
 func (m *Model) GetSelected() string {
-	if m.selected == -1 {
-		return ""
-	}
-	return m.choices[m.selected].path
+	return m.choices[m.cursor].path
 }
 
 func (m *Model) Init() tea.Cmd { return nil }
@@ -68,8 +63,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor++
 			}
 
-		case "enter", "l":
-			m.selected = m.cursor
+		case "backspace", "h":
+			m.SetCurrent(filepath.Dir(m.root))
 		}
 	}
 
@@ -79,10 +74,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *Model) View() string {
 	selectedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#363cb3")).Bold(true)
 
-	s := ""
+	s := fmt.Sprintf("%s\n", m.root)
 	for i, choice := range m.choices {
 		cursor := " "
-		path := choice.path
+		path := strings.TrimPrefix(choice.path, m.root)
 		if m.cursor == i {
 			cursor = ">"
 			path = selectedStyle.Render(path)

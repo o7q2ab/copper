@@ -11,7 +11,7 @@ import (
 	"github.com/o7q2ab/copper/internal/pearls/picker"
 )
 
-const version = "copper day-6"
+const version = "copper day-7"
 
 const (
 	color1 = "#454D66"
@@ -66,29 +66,29 @@ func (c *copper) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "q":
 			return c, tea.Quit
 
-		case "t":
-			switch c.stage.(type) {
-			case *picker.Model:
-				c.stage = c.finder
-
-			case *finder.Model:
+		case "esc":
+			if _, ok := c.stage.(*finder.Model); ok {
 				c.stage = c.picker
+			}
+
+		case "f":
+			if _, ok := c.stage.(*picker.Model); ok {
+				c.finder.SetCurrent(c.picker.GetCurrent())
+				c.stage = c.finder
+			}
+
+		case "enter":
+			if _, ok := c.stage.(*finder.Model); ok {
+				if selected := c.finder.GetSelected(); selected != "" {
+					c.picker.SetCurrent(filepath.Dir(selected))
+				}
+				c.stage = c.picker
+				return c, nil
 			}
 		}
 	}
 
-	switch c.stage.(type) {
-	case *picker.Model:
-		if selected := c.finder.GetSelected(); selected != "" {
-			c.picker.SetCurrent(filepath.Dir(selected))
-		}
-
-	case *finder.Model:
-		c.finder.SetCurrent(c.picker.GetCurrent())
-
-	}
 	_, cmd := c.stage.Update(msg)
-
 	return c, cmd
 }
 
