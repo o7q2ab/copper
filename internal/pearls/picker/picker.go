@@ -3,6 +3,7 @@ package picker
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -72,6 +73,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "backspace", "h":
 			m.refresh(filepath.Dir(m.cwd))
+
+		case "c":
+			_ = exec.Command("code", m.cwd).Run()
 
 		}
 	}
