@@ -28,7 +28,7 @@ type Model struct {
 
 func (m *Model) SetCurrent(root string) {
 	m.root = root
-
+	m.cursor = 0
 	m.choices = []*goProject{}
 	filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		switch filepath.Base(path) {
