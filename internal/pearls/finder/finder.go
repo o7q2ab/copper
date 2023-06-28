@@ -3,13 +3,11 @@ package finder
 import (
 	"fmt"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"golang.org/x/mod/modfile"
 )
 
 func New() *Model {
@@ -85,16 +83,4 @@ func (m *Model) View() string {
 		s += fmt.Sprintf("%s %s\n", cursor, path)
 	}
 	return s
-}
-
-func readModFile(path string) (*modfile.File, error) {
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	f, err := modfile.Parse(path, content, nil)
-	if err != nil {
-		return nil, err
-	}
-	return f, nil
 }

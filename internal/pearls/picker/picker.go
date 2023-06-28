@@ -9,7 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"golang.org/x/mod/modfile"
+	"github.com/o7q2ab/copper/internal/gomod"
 )
 
 func New() (*Model, error) {
@@ -104,20 +104,12 @@ func (m *Model) View() string {
 		name := choice.Name()
 
 		if name == "go.mod" {
-			gomod, err := readModFile(filepath.Join(m.cwd, name))
+			gomodInfo, err := gomod.Read(filepath.Join(m.cwd, name))
 			if err != nil {
 				s = fmt.Sprintf("Module: (error) %s\n\n", err)
 			}
-			directDeps, indirectDeps := 0, 0
-			for _, d := range gomod.Require {
-				if d.Indirect {
-					indirectDeps++
-				} else {
-					directDeps++
-				}
-			}
 			s = fmt.Sprintf("Module: %s\n\tdirect dependencies: %d\n\tindirect dependencies: %d\n\n",
-				gomod.Module.Mod.Path, directDeps, indirectDeps) + s
+				gomodInfo.Path, gomodInfo.DirectDepsCnt, gomodInfo.IndirectDepsCnt) + s
 		}
 
 		switch {
@@ -148,16 +140,4 @@ func (m *Model) View() string {
 	s = fmt.Sprintf("%s\n\n", m.cwd) + s
 
 	return s
-}
-
-func readModFile(path string) (*modfile.File, error) {
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	f, err := modfile.Parse(path, content, nil)
-	if err != nil {
-		return nil, err
-	}
-	return f, nil
 }
