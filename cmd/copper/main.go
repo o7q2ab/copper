@@ -8,10 +8,11 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/o7q2ab/copper/internal/pearls/finder"
+	"github.com/o7q2ab/copper/internal/pearls/menu"
 	"github.com/o7q2ab/copper/internal/pearls/picker"
 )
 
-const version = "copper day-9"
+const version = "copper day-10"
 
 const (
 	color1 = "#454D66"
@@ -28,13 +29,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	finderModel := finder.New()
-
 	model := &copper{
 		stage: pickerModel,
 
+		menu:   menu.New(),
 		picker: pickerModel,
-		finder: finderModel,
+		finder: finder.New(),
 	}
 
 	p := tea.NewProgram(model, tea.WithAltScreen())
@@ -49,6 +49,7 @@ type copper struct {
 
 	stage tea.Model
 
+	menu   *menu.Model
 	picker *picker.Model
 	finder *finder.Model
 }
@@ -67,7 +68,12 @@ func (c *copper) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return c, tea.Quit
 
 		case "esc":
-			if _, ok := c.stage.(*finder.Model); ok {
+			switch c.stage.(type) {
+			case *menu.Model:
+				c.stage = c.picker
+			case *picker.Model:
+				c.stage = c.menu
+			case *finder.Model:
 				c.stage = c.picker
 			}
 
