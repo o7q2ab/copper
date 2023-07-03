@@ -5,12 +5,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 
+	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/o7q2ab/copper/internal/gomod"
 )
+
+const height = 20
 
 func New() (*Model, error) {
 	cwd, err := os.Getwd()
@@ -18,64 +19,75 @@ func New() (*Model, error) {
 		return nil, fmt.Errorf("os.Getwd(): %w", err)
 	}
 
-	choices, err := os.ReadDir(cwd)
+	choices, err := readDir(cwd)
 	if err != nil {
-		return nil, fmt.Errorf("os.ReadDir(): %w", err)
+		return nil, fmt.Errorf("readDir(%s): %v", cwd, err)
 	}
 
+	delegate := list.DefaultDelegate{
+		ShowDescription: false,
+		Styles:          list.NewDefaultItemStyles(),
+	}
+	delegate.SetHeight(1)
+
+	filelist := list.New(toBubble(choices), delegate, 0, min(height, len(choices)+5))
+	filelist.SetShowHelp(false)
+	filelist.Title = cwd
+
 	model := &Model{
-		cwd:     cwd,
-		choices: choices,
+		list: filelist,
 	}
 
 	return model, nil
 }
 
 type Model struct {
-	cwd     string
-	choices []os.DirEntry
-	cursor  int
-	err     error
+	list list.Model
+	err  error
 }
 
-func (m *Model) GetCurrent() string    { return m.cwd }
+func (m *Model) GetCurrent() string    { return m.list.SelectedItem().(*fileinfo).parent }
 func (m *Model) SetCurrent(cwd string) { m.refresh(cwd) }
 
 func (m *Model) refresh(path string) {
-	m.cwd = path
-	m.choices, m.err = os.ReadDir(m.cwd)
-	m.cursor = 0
+	choices, err := readDir(path)
+	m.err = err
+	m.list.Title = path
+	_ = m.list.SetItems(toBubble(choices))
+	m.list.ResetSelected()
+	m.list.SetHeight(min(height, len(choices)+5))
 }
 
 func (m *Model) Init() tea.Cmd { return nil }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.list.SetWidth(msg.Width)
+
 	case tea.KeyMsg:
 		switch msg.String() {
 
 		case "up", "k":
-			if m.cursor > 0 {
-				m.cursor--
-			}
+			m.list.CursorUp()
 
 		case "down", "j":
-			if m.cursor < len(m.choices)-1 {
-				m.cursor++
-			}
+			m.list.CursorDown()
 
 		case "enter", "l":
-			choice := m.choices[m.cursor]
-			if !choice.Type().IsDir() {
+			choice := m.list.SelectedItem().(*fileinfo)
+			if !choice.isDir {
 				break
 			}
-			m.refresh(filepath.Join(m.cwd, m.choices[m.cursor].Name()))
+			m.refresh(filepath.Join(choice.parent, choice.name))
 
 		case "backspace", "h":
-			m.refresh(filepath.Dir(m.cwd))
+			choice := m.list.SelectedItem().(*fileinfo)
+			m.refresh(filepath.Dir(choice.parent))
 
 		case "c":
-			_ = exec.Command("code", m.cwd).Run()
+			choice := m.list.SelectedItem().(*fileinfo)
+			_ = exec.Command("code", choice.parent).Run()
 
 		}
 	}
@@ -88,56 +100,24 @@ func (m *Model) View() string {
 		return fmt.Sprintf("error: %v\n\nPress backspace to go back.\nPress q to quit.\n", m.err)
 	}
 
-	goStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#363cb3"))
-	goBoldStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#363cb3")).Bold(true)
-	hiddenStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#999999"))
-	dirStyle := lipgloss.NewStyle().Bold(true)
-
 	var s string
-
-	for i, choice := range m.choices {
-		cursor := " "
-		if m.cursor == i {
-			cursor = ">"
-		}
-
-		name := choice.Name()
-
-		if name == "go.mod" {
-			gomodInfo, err := gomod.Read(filepath.Join(m.cwd, name))
+	for _, itm := range m.list.Items() {
+		if choice := itm.(*fileinfo); choice.name == "go.mod" {
+			gomodInfo, err := gomod.Read(filepath.Join(choice.parent, choice.name))
 			if err != nil {
 				s = fmt.Sprintf("Module: (error) %s\n\n", err)
 			}
 			s = fmt.Sprintf("Module: %s\n\tdirect dependencies: %d\n\tindirect dependencies: %d\n\n",
 				gomodInfo.Path, gomodInfo.DirectDepsCnt, gomodInfo.IndirectDepsCnt) + s
 		}
-
-		switch {
-		case name == "go.mod" || name == "go.sum" || name == "go.work" || name == "go.work.sum":
-			name = goBoldStyle.Render(name)
-
-		case strings.HasSuffix(name, ".go"):
-			name = goStyle.Render(name)
-
-		case strings.HasPrefix(name, "."):
-			name = hiddenStyle.Render(name)
-		}
-
-		if choice.Type().IsDir() {
-			name = dirStyle.Render(name)
-
-			s += fmt.Sprintf("%s %s\n", cursor, name)
-		} else {
-			info, err := choice.Info()
-			if err != nil {
-				s += fmt.Sprintf("%s %s (%v)\n", cursor, name, err)
-			} else {
-				s += fmt.Sprintf("%s %s (%d bytes)\n", cursor, name, info.Size())
-			}
-		}
 	}
 
-	s = fmt.Sprintf("%s\n\n", m.cwd) + s
+	return s + "\n" + m.list.View()
+}
 
-	return s
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
