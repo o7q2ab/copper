@@ -12,7 +12,7 @@ import (
 	"github.com/o7q2ab/copper/internal/pearls/picker"
 )
 
-const version = "copper day-13"
+const version = "copper day-14"
 
 const (
 	color1 = "#454D66"
@@ -106,7 +106,7 @@ func (c *copper) View() string {
 		Width(c.windowWidth).
 		Align(lipgloss.Center)
 
-	s := style.Render(version) + "\n"
+	s := style.Render(version) + "\n\n"
 	s += c.stage.View()
 	s += "\nPress q to quit.\n"
 	return s

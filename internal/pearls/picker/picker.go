@@ -5,23 +5,25 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/o7q2ab/copper/internal/gomod"
 )
 
-const height = 20
+const (
+	listw = 60
+	listh = 20
+
+	gomodw = 40
+)
 
 func New() (*Model, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("os.Getwd(): %w", err)
-	}
-
-	choices, err := readDir(cwd)
-	if err != nil {
-		return nil, fmt.Errorf("readDir(%s): %v", cwd, err)
 	}
 
 	delegate := list.DefaultDelegate{
@@ -30,33 +32,26 @@ func New() (*Model, error) {
 	}
 	delegate.SetHeight(1)
 
-	filelist := list.New(toBubble(choices), delegate, 0, min(height, len(choices)+5))
+	filelist := list.New(nil, delegate, listw, listh)
 	filelist.SetShowHelp(false)
-	filelist.Title = cwd
 
 	model := &Model{
 		list: filelist,
 	}
+	model.readDir(cwd)
 
 	return model, nil
 }
 
 type Model struct {
-	list list.Model
-	err  error
+	cwd   string
+	gomod string
+	list  list.Model
+	err   error
 }
 
-func (m *Model) GetCurrent() string    { return m.list.SelectedItem().(*fileinfo).parent }
-func (m *Model) SetCurrent(cwd string) { m.refresh(cwd) }
-
-func (m *Model) refresh(path string) {
-	choices, err := readDir(path)
-	m.err = err
-	m.list.Title = path
-	_ = m.list.SetItems(toBubble(choices))
-	m.list.ResetSelected()
-	m.list.SetHeight(min(height, len(choices)+5))
-}
+func (m *Model) GetCurrent() string    { return m.cwd }
+func (m *Model) SetCurrent(cwd string) { m.readDir(cwd) }
 
 func (m *Model) Init() tea.Cmd { return nil }
 
@@ -79,15 +74,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if !choice.isDir {
 				break
 			}
-			m.refresh(filepath.Join(choice.parent, choice.name))
+			m.readDir(filepath.Join(m.cwd, choice.name))
 
 		case "backspace", "h":
-			choice := m.list.SelectedItem().(*fileinfo)
-			m.refresh(filepath.Dir(choice.parent))
+			m.readDir(filepath.Dir(m.cwd))
 
 		case "c":
-			choice := m.list.SelectedItem().(*fileinfo)
-			_ = exec.Command("code", choice.parent).Run()
+			_ = exec.Command("code", m.cwd).Run()
 
 		}
 	}
@@ -100,24 +93,89 @@ func (m *Model) View() string {
 		return fmt.Sprintf("error: %v\n\nPress backspace to go back.\nPress q to quit.\n", m.err)
 	}
 
+	if m.gomod == "" {
+		return m.list.View()
+	}
+
 	var s string
-	for _, itm := range m.list.Items() {
-		if choice := itm.(*fileinfo); choice.name == "go.mod" {
-			gomodInfo, err := gomod.Read(filepath.Join(choice.parent, choice.name))
-			if err != nil {
-				s = fmt.Sprintf("Module: (error) %s\n\n", err)
-			}
-			s = fmt.Sprintf("Module: %s\n\tdirect dependencies: %d\n\tindirect dependencies: %d\n\n",
-				gomodInfo.Path, gomodInfo.DirectDepsCnt, gomodInfo.IndirectDepsCnt) + s
+	gomodInfo, err := gomod.Read(m.gomod)
+	if err != nil {
+		s = fmt.Sprintf("Module: (error) %s\n\n", err)
+	}
+	s = fmt.Sprintf("%s\n\ndirect dependencies: %d\nindirect dependencies: %d",
+		gomodInfo.Path, gomodInfo.DirectDepsCnt, gomodInfo.IndirectDepsCnt) + s
+
+	return lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		m.list.View(),
+		lipgloss.NewStyle().Width(gomodw).BorderLeft(true).Padding(1, 1, 1, 1).Foreground(lipgloss.Color("#EFEEB4")).Background(lipgloss.Color("#454D66")).Render(s),
+	)
+
+}
+
+func (m *Model) readDir(path string) {
+	m.cwd = path
+	m.gomod = ""
+
+	files, err := os.ReadDir(path)
+	if err != nil {
+		m.err = err
+		return
+	}
+
+	res := make([]*fileinfo, len(files))
+
+	shift := 0
+
+	for _, f := range files {
+		if !f.Type().IsDir() {
+			continue
+		}
+
+		item := &fileinfo{
+			parent:   path,
+			name:     f.Name(),
+			isDir:    true,
+			isHidden: strings.HasPrefix(f.Name(), "."),
+			isGoCode: false,
+			size:     -1,
+		}
+
+		if info, err := f.Info(); err == nil {
+			item.size = info.Size()
+		}
+
+		res[shift] = item
+		shift++
+	}
+
+	for _, f := range files {
+		if f.Type().IsDir() {
+			continue
+		}
+
+		item := &fileinfo{
+			parent:   path,
+			name:     f.Name(),
+			isDir:    false,
+			isHidden: strings.HasPrefix(f.Name(), "."),
+			isGoCode: strings.HasSuffix(f.Name(), ".go"),
+			size:     -1,
+		}
+
+		if info, err := f.Info(); err == nil {
+			item.size = info.Size()
+		}
+
+		res[shift] = item
+		shift++
+
+		if item.name == "go.mod" {
+			m.gomod = filepath.Join(path, item.name)
 		}
 	}
 
-	return s + "\n" + m.list.View()
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
+	m.list.Title = path
+	_ = m.list.SetItems(toBubble(res))
+	m.list.ResetSelected()
 }
