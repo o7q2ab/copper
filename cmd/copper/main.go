@@ -12,7 +12,7 @@ import (
 	"github.com/o7q2ab/copper/internal/pearls/picker"
 )
 
-const version = "copper day-14"
+const version = "copper day-15"
 
 const (
 	color1 = "#454D66"

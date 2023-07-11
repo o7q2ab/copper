@@ -14,7 +14,6 @@ import (
 )
 
 const (
-	listw = 60
 	listh = 20
 
 	gomodw = 40
@@ -32,7 +31,7 @@ func New() (*Model, error) {
 	}
 	delegate.SetHeight(1)
 
-	filelist := list.New(nil, delegate, listw, listh)
+	filelist := list.New(nil, delegate, 0, listh)
 	filelist.SetShowHelp(false)
 
 	model := &Model{
@@ -58,7 +57,7 @@ func (m *Model) Init() tea.Cmd { return nil }
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.list.SetWidth(msg.Width)
+		m.list.SetWidth(msg.Width - gomodw)
 
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -108,9 +107,8 @@ func (m *Model) View() string {
 	return lipgloss.JoinHorizontal(
 		lipgloss.Top,
 		m.list.View(),
-		lipgloss.NewStyle().Width(gomodw).BorderLeft(true).Padding(1, 1, 1, 1).Foreground(lipgloss.Color("#EFEEB4")).Background(lipgloss.Color("#454D66")).Render(s),
+		lipgloss.NewStyle().Width(gomodw).Padding(1, 1, 1, 1).Foreground(lipgloss.Color("#EFEEB4")).Background(lipgloss.Color("#454D66")).Render(s),
 	)
-
 }
 
 func (m *Model) readDir(path string) {
